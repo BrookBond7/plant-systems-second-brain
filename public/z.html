@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LLD Executive Operations Center</title>
+  <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+  <style>
+    :root{
+      --bg:#eef2f7;
+      --bg2:#e6ebf3;
+      --surface:#ffffff;
+      --surface-2:#f7f9fc;
+      --surface-3:#f1f5fa;
+      --ink:#13233b;
+      --ink-2:#2d3f5e;
+      --muted:#6f819d;
+      --line:#d8e0ec;
+      --line-2:#c7d2e3;
+      --navy:#17365d;
+      --blue:#2f6fed;
+      --teal:#0f8e97;
+      --green:#1e9a5d;
+      --amber:#cf8a11;
+      --red:#c64d4d;
+      --purple:#735ce0;
+      --shadow:0 10px 30px rgba(19,35,59,.08);
+      --radius:18px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),var(--bg2));font-family:var(--font);color:var(--ink);overflow:hidden}
+    body{letter-spacing:.01em}
+    .app{display:grid;grid-template-rows:86px 1fr;height:100%;padding:14px;gap:14px}
+    .shell{display:grid;grid-template-columns:330px 1.34fr 1fr;gap:14px;min-height:0}
+    .topbar,.panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}
+    .topbar{display:grid;grid-template-columns:1.05fr .95fr 1fr;align-items:center;padding:0 20px;gap:16px}
+    .brand .eyebrow{font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted)}
+    .brandRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:5px}
+    .brand h1{margin:0;font-size:34px;font-weight:850;letter-spacing:-.02em;color:var(--navy);line-height:1}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface-2);font-size:12px;font-weight:800;color:var(--ink-2)}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .green{background:var(--green)} .red{background:var(--red)} .amber{background:var(--amber)} .blue{background:var(--blue)} .teal{background:var(--teal)} .purple{background:var(--purple)}
+    .scoreboard{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+    .scoreCard{padding:10px 12px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line)}
+    .scoreCard .k{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+    .scoreCard .v{font-size:30px;font-weight:850;color:var(--navy);line-height:1.05;margin-top:4px}
+    .scoreCard .s{font-size:12px;color:var(--muted);margin-top:3px}
+    .topControls{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap}
+    .clock{font-size:18px;font-weight:800;color:var(--navy)}
+    .btn{border:1px solid var(--line-2);background:var(--surface-2);color:var(--navy);padding:10px 14px;border-radius:12px;font-weight:800;cursor:pointer}
+    .panel{padding:14px;min-height:0;overflow:hidden}
+    .leftCol,.centerCol,.rightCol{display:grid;gap:14px;min-height:0}
+    .leftCol{grid-template-rows:auto auto 1fr auto}
+    .centerCol{grid-template-rows:auto auto auto 1fr}
+    .rightCol{grid-template-rows:auto auto 1fr auto auto}
+    .sectionTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .sectionTitle .t{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted)}
+    .sectionTitle .s{font-size:11px;font-weight:700;color:var(--muted)}
+    .lineList{display:grid;gap:10px}
+    .lineCard{padding:14px;border-radius:16px;border:1px solid var(--line);background:var(--surface);cursor:pointer;transition:border-color .15s ease, transform .15s ease, box-shadow .15s ease}
+    .lineCard:hover{transform:translateY(-1px);box-shadow:0 10px 20px rgba(19,35,59,.06)}
+    .lineCard.active{border-color:var(--blue);box-shadow:0 0 0 2px rgba(47,111,237,.08)}
+    .lineTop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .lineName{font-size:22px;font-weight:850;color:var(--navy)}
+    .lineSub{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+    .statePill{min-width:110px;text-align:center;padding:8px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.9px;text-transform:uppercase;border:1px solid var(--line-2);background:var(--surface-2)}
+    .lineGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+    .mini{padding:8px 10px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+    .mini .k{font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+    .mini .v{font-size:15px;font-weight:800;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+    .miniBar{height:8px;border-radius:999px;background:#edf2f8;border:1px solid var(--line);overflow:hidden;margin-top:10px}
+    .miniBar > span{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--blue))}
+    .matrix{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .matrixCell{height:86px;border-radius:14px;padding:10px;border:1px solid var(--line);background:var(--surface-2);display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+    .matrixCell .top{display:flex;justify-content:space-between;align-items:center}.matrixCell .ln{font-size:12px;font-weight:800;color:var(--ink-2)}.matrixCell .rs{font-size:18px;font-weight:850}.matrixCell .sub{font-size:11px;font-weight:700;color:var(--muted)}
+    .focusGrid{display:grid;grid-template-columns:1.4fr .85fr;gap:14px}
+    .heroPanel,.sidePanel,.timelinePanel,.stripPanel,.ledgerPanel,.paretoPanel,.actionsPanel,.footerPanel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;min-height:0;overflow:hidden}
+    .liveRibbon{position:absolute;top:14px;right:14px;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--line-2);background:var(--surface-2)}
+    .heroPanel{position:relative}
+    .heroTop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .heroTitle{font-size:42px;font-weight:850;line-height:1;color:var(--navy)}
+    .heroSub{margin-top:6px;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+    .focusState{display:flex;align-items:center;gap:16px;margin-top:14px}
+    .focusNum{font-size:84px;font-weight:850;line-height:.9}
+    .focusTxt{font-size:28px;font-weight:850;letter-spacing:.02em;text-transform:uppercase}
+    .faultLine{margin-top:8px;font-size:14px;font-weight:700;color:var(--ink-2)}
+    .heroMeta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+    .metaBox{padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+    .metaBox .k{font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+    .metaBox .v{font-size:18px;font-weight:800;color:var(--navy);margin-top:6px}
+    .metaBox .s{font-size:11px;color:var(--muted);margin-top:4px}
+    .priorityStrip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+    .priorityCard{padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+    .priorityCard .ttl{font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+    .priorityCard .body{font-size:14px;font-weight:750;line-height:1.35;margin-top:6px;color:var(--ink)}
+    .gaugeWrap{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center}
+    #oeeDial,#fleetDial{width:120px;height:120px}.oeeBig{font-size:42px;font-weight:850;color:var(--navy);line-height:.95}.oeeSub{margin-top:7px;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.oeeEnds{margin-top:6px;font-size:13px;font-weight:800;color:var(--ink-2)}
+    .legendWrap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}.legend{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);font-size:11px;font-weight:800;color:var(--ink-2);min-width:0}.legend i{width:12px;height:12px;border-radius:50%;flex:0 0 auto}.legend .txt{display:flex;flex-direction:column;min-width:0}.legend .txt b{font-size:12px;color:var(--ink);font-weight:800}.legend .txt span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+    .portfolioGrid{display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:center}
+    .stackBlock{display:grid;gap:10px}
+    .stackBar{height:16px;border-radius:999px;overflow:hidden;border:1px solid var(--line);background:#edf2f8;display:flex}
+    .seg{height:100%}
+    .freshRow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .freshCard{padding:10px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+    .freshCard .name{font-size:11px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:1px}.freshCard .val{font-size:18px;font-weight:850;color:var(--navy);margin-top:4px}.freshCard .bar{margin-top:8px}
+    canvas{display:block;width:100%;height:100%}
+    #focusTimeline{width:100%;height:176px} #microChart{width:100%;height:160px} #allLinesStrip{width:100%;height:210px} #paretoChart{width:100%;height:220px} #stateTrend{width:100%;height:140px}
+    .events{display:grid;gap:8px;max-height:100%;overflow:auto;padding-right:4px}
+    .event{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:10px 12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+    .event .txt{font-size:13px;font-weight:800;line-height:1.3;color:var(--ink)}.event .sub{font-size:11px;color:var(--muted);margin-top:4px}.event .time{font-size:11px;color:var(--muted);font-weight:800;white-space:nowrap}
+    .actionList{display:grid;gap:10px}.action{padding:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}.action .ttl{font-size:14px;font-weight:800;color:var(--navy)}.action .body{font-size:12px;color:var(--ink-2);margin-top:5px;line-height:1.35}
+    .smallList{display:grid;gap:8px}.smallRow{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center}.bar{height:10px;border-radius:999px;background:#edf2f8;overflow:hidden;border:1px solid var(--line)} .bar>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--teal),var(--blue))}
+    .ticker{display:flex;align-items:center;gap:12px;overflow:hidden;white-space:nowrap}.marquee{display:flex;gap:28px;min-width:max-content;animation:marq 34s linear infinite}.marquee span{font-size:13px;font-weight:800;color:var(--ink-2)}@keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .footerGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;height:100%}
+    @media (max-width:1600px){.shell{grid-template-columns:310px 1.25fr 1fr}.scoreboard{grid-template-columns:repeat(2,1fr)}.heroMeta{grid-template-columns:repeat(2,1fr)}.priorityStrip{grid-template-columns:1fr}.freshRow{grid-template-columns:repeat(3,1fr)}}
+    @media (max-width:1280px){body{overflow:auto}.app{height:auto;min-height:100%}.shell{grid-template-columns:1fr}.topbar{grid-template-columns:1fr;gap:12px;height:auto;padding:16px}.matrix{grid-template-columns:repeat(2,minmax(0,1fr))}.freshRow{grid-template-columns:repeat(2,1fr)}}
+  .assistantToggle{position:fixed;right:18px;bottom:18px;z-index:40;border:1px solid var(--line-2);background:linear-gradient(180deg,#17365d,#21497e);color:#fff;padding:12px 16px;border-radius:14px;font-weight:800;box-shadow:0 14px 30px rgba(23,54,93,.22);cursor:pointer}
+    .assistantPanel{position:fixed;top:14px;right:14px;bottom:14px;width:420px;max-width:calc(100vw - 28px);background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(19,35,59,.18);z-index:50;display:grid;grid-template-rows:auto auto auto 1fr auto;transform:translateX(calc(100% + 24px));transition:transform .22s ease}
+    .assistantPanel.open{transform:translateX(0)}
+    .assistantHeader{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;background:linear-gradient(180deg,#f9fbfe,#f3f7fc);border-top-left-radius:22px;border-top-right-radius:22px}
+    .assistantHeader h3{margin:0;font-size:20px;font-weight:850;color:var(--navy)}
+    .assistantHeader .sub{margin-top:4px;font-size:12px;color:var(--muted);font-weight:700}
+    .assistantStatus{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);font-weight:800}
+    .assistantContext{padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .contextChip{padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:12px;color:var(--ink-2);font-weight:700;min-width:0}
+    .assistantActions{display:flex;gap:8px;overflow:auto;padding:10px 16px 0}
+    .assistantAction{flex:0 0 auto;padding:8px 10px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface-2);font-size:12px;font-weight:800;color:var(--navy);cursor:pointer}
+    .assistantMessages{padding:14px 16px;overflow:auto;display:grid;gap:10px;background:linear-gradient(180deg,#fff,#f8fbff)}
+    .msg{max-width:90%;padding:10px 12px;border-radius:14px;line-height:1.4;font-size:14px;white-space:pre-wrap}
+    .msg.user{justify-self:end;background:#17365d;color:#fff;border-bottom-right-radius:6px}
+    .msg.assistant{justify-self:start;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-bottom-left-radius:6px}
+    .assistantComposer{padding:12px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:10px;background:var(--surface)}
+    .assistantComposer textarea{resize:none;min-height:68px;max-height:180px;padding:12px;border-radius:14px;border:1px solid var(--line-2);font:inherit;color:var(--ink);background:var(--surface-2)}
+    .assistantSend{padding:12px 16px;border-radius:14px;border:1px solid var(--line-2);background:linear-gradient(180deg,#17365d,#21497e);color:#fff;font-weight:800;cursor:pointer}
+    .assistantSend[disabled]{opacity:.55;cursor:not-allowed}
+    .assistantClose{border:1px solid var(--line-2);background:var(--surface);color:var(--navy);width:36px;height:36px;border-radius:10px;font-weight:800;cursor:pointer}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="eyebrow">York MES · Liquid Laundry · Executive Overview</div>
+      <div class="brandRow">
+        <h1>LLD Operations Center</h1>
+        <span class="chip"><span class="dot blue"></span>Enterprise View</span>
+        <span class="chip"><span class="dot" id="liveDot"></span><span id="liveStatusText">Waiting for data</span></span>
+      </div>
+    </div>
+    <div class="scoreboard" id="heroScore"></div>
+    <div class="topControls">
+      <div class="chip"><span class="dot" id="mqttDot"></span><span id="mqttText">MQTT down</span></div>
+      <div class="chip"><span class="dot" id="netDot"></span><span id="netText">Network</span></div>
+      <div class="chip"><span class="dot purple"></span><span id="shiftText">Shift --</span></div>
+      <div class="chip"><span class="dot amber"></span><span id="countdownText">Ends in --:--:--</span></div>
+      <div class="clock" id="clockText">--:--:--</div>
+      <button class="btn" id="rotateBtn">Pause Rotate</button>
+    </div>
+  </header>
+
+  <div class="shell">
+    <aside class="leftCol">
+      <section class="panel">
+        <div class="sectionTitle"><div class="t">Line Portfolio</div><div class="s">select line focus</div></div>
+        <div class="lineList" id="lineList"></div>
+      </section>
+      <section class="panel">
+        <div class="sectionTitle"><div class="t">State Matrix</div><div class="s">current snapshot</div></div>
+        <div class="matrix" id="statusMatrix"></div>
+      </section>
+      <section class="panel" style="display:grid;grid-template-rows:auto 1fr;min-height:0;">
+        <div class="sectionTitle"><div class="t">Executive Attention</div><div class="s">ranked by urgency</div></div>
+        <div class="actionList" id="attentionList"></div>
+      </section>
+      <section class="panel">
+        <div class="sectionTitle"><div class="t">Rolling Site Feed</div><div class="s">live summary</div></div>
+        <div class="ticker"><div class="marquee" id="siteTicker"></div></div>
+      </section>
+    </aside>
+
+    <main class="centerCol">
+      <section class="panel">
+        <div class="focusGrid">
+          <div class="heroPanel">
+            <div class="liveRibbon" id="focusLive">STALE</div>
+            <div class="heroTop">
+              <div>
+                <div class="heroTitle" id="focusTitle">LLD1</div>
+                <div class="heroSub">Liquid Laundry · Focused operating line</div>
+                <div class="focusState">
+                  <div class="focusNum" id="focusNum">-</div>
+                  <div>
+                    <div class="focusTxt" id="focusTxt">No Data</div>
+                    <div class="faultLine" id="focusFault">FaultCode: --------</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="heroMeta" id="focusMeta"></div>
+            <div class="priorityStrip" id="priorityStrip"></div>
+          </div>
+          <div class="sidePanel">
+            <div class="sectionTitle"><div class="t">Shift Availability</div><div class="s">run-status proxy</div></div>
+            <div class="gaugeWrap">
+              <canvas id="oeeDial"></canvas>
+              <div>
+                <div class="oeeBig" id="oeePct">0%</div>
+                <div class="oeeSub" id="oeeShift">Shift --</div>
+                <div class="oeeEnds" id="oeeEnds">Ends in --:--:--</div>
+              </div>
+            </div>
+            <canvas id="microChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="sectionTitle"><div class="t">Portfolio Health</div><div class="s">live composition and freshness</div></div>
+        <div class="portfolioGrid">
+          <canvas id="fleetDial"></canvas>
+          <div class="stackBlock">
+            <div>
+              <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">State Composition</div>
+              <div class="stackBar" id="stateComposition"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Publisher Freshness</div>
+              <div class="freshRow" id="freshnessRow"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="timelinePanel">
+        <div class="sectionTitle"><div class="t">Shift State Timeline</div><div class="s">5-minute buckets across current shift</div></div>
+        <div class="legendWrap" id="legendWrap"></div>
+        <canvas id="focusTimeline"></canvas>
+      </section>
+
+      <section class="stripPanel">
+        <div class="sectionTitle"><div class="t">Cross-Line State Strip</div><div class="s">rolling 60-minute comparison</div></div>
+        <canvas id="allLinesStrip"></canvas>
+      </section>
+
+      <section class="footerPanel" style="min-height:0;">
+        <div class="footerGrid">
+          <div class="panel" style="padding:12px;box-shadow:none;">
+            <div class="sectionTitle"><div class="t">Category Accumulation</div><div class="s">top categories this shift</div></div>
+            <div class="smallList" id="categoryBars"></div>
+          </div>
+          <div class="panel" style="padding:12px;box-shadow:none;">
+            <div class="sectionTitle"><div class="t">Focused Interpretation</div><div class="s">current executive readout</div></div>
+            <div class="actionList" id="decoderPanel"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="rightCol">
+      <section class="paretoPanel panel" style="box-shadow:none;">
+        <div class="sectionTitle"><div class="t">Loss Pareto</div><div class="s">focus line</div></div>
+        <canvas id="paretoChart"></canvas>
+      </section>
+      <section class="panel" style="box-shadow:none;">
+        <div class="sectionTitle"><div class="t">Trend Overview</div><div class="s">last 60 minutes across portfolio</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:800;color:var(--muted);">0-4 RunStatus scale · last 60 minutes</div>
+          <button class="btn" id="smoothBtn" style="padding:8px 10px;font-size:12px;">Smoothing: Off</button>
+        </div>
+        <canvas id="stateTrend"></canvas>
+      </section>
+      <section class="ledgerPanel panel" style="display:grid;grid-template-rows:auto 1fr;min-height:0;box-shadow:none;">
+        <div class="sectionTitle"><div class="t">Event Ledger</div><div class="s">latest transitions</div></div>
+        <div class="events" id="eventsList"></div>
+      </section>
+      <section class="actionsPanel panel" style="box-shadow:none;">
+        <div class="sectionTitle"><div class="t">Portfolio Summary</div><div class="s">cross-line rollup</div></div>
+        <div class="smallList" id="broadcastList"></div>
+      </section>
+      <section class="actionsPanel panel" style="box-shadow:none;">
+        <div class="sectionTitle"><div class="t">Session + Transport</div><div class="s">browser diagnostics</div></div>
+        <div class="actionList" id="sessionPanel"></div>
+      </section>
+    </aside>
+  </div>
+  <button class="assistantToggle" id="assistantToggle">Plant Systems Second Brain</button>
+  <aside class="assistantPanel" id="assistantPanel" aria-label="Plant Systems Second Brain">
+    <div class="assistantHeader">
+      <div>
+        <h3>Plant Systems Second Brain</h3>
+        <div class="sub">Embedded operator and engineer copilot for York MES</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="assistantStatus"><span class="dot blue" id="assistantDot"></span><span id="assistantStatusText">Ready</span></div>
+        <button class="assistantClose" id="assistantClose">×</button>
+      </div>
+    </div>
+    <div class="assistantContext" id="assistantContext"></div>
+    <div class="assistantActions">
+      <button class="assistantAction" data-prompt="Explain the current focused line in plant language.">Explain current line</button>
+      <button class="assistantAction" data-prompt="Summarize the top losses and likely focus for the current line.">Summarize top losses</button>
+      <button class="assistantAction" data-prompt="Compare all five LLD lines and tell me which needs attention first.">Compare all lines</button>
+      <button class="assistantAction" data-prompt="What should I check next based on current MES state and freshness?">What should I check next?</button>
+    </div>
+    <div class="assistantMessages" id="assistantMessages">
+      <div class="msg assistant">Connected UI shell ready. Ask about the focused line, cross-line comparison, loss interpretation, or next checks.</div>
+    </div>
+    <div class="assistantComposer">
+      <textarea id="assistantInput" placeholder="Ask about LLD status, faults, trends, top losses, or what to check next..."></textarea>
+      <button class="assistantSend" id="assistantSend">Send</button>
+    </div>
+  </aside>
+</div>
+<script>
+const CONFIG = {host:"vb8eaabb.us-east-1.emqx.cloud",protocol:"wss",port:8084,path:"/mqtt",username:"m5tab",password:"#Gateway13",clientIdPrefix:"Tab5Web-",clean:true,keepalive:30,connectTimeout:4000,reconnectPeriod:2000};
+const mqtt_rs=["transport/yo/mes/lld1/RS","transport/yo/mes/lld2/RS","transport/yo/mes/lld3/RS","transport/yo/mes/lld4/RS","transport/yo/mes/lld5/RS"];
+const mqtt_l=["transport/yo/mes/lld1","transport/yo/mes/lld2","transport/yo/mes/lld3","transport/yo/mes/lld4","transport/yo/mes/lld5"];
+const TZ="America/New_York", SHIFT_MS=8*60*60*1000, HIST_LEN=60, BUCKET_MS=60*1000, TIMELINE_LEN=96, TIMELINE_BUCKET_MS=5*60*1000;
+let smoothTrend=false;
+const CAT_KEYS=["Stop","Run","Fault","Idle","Changeover","Filler Safety","Filler Machine Not Ready","Filler Machine Jam","Filler Motor Drive Status","Filler Pump/Valve/Act","Filler Instrumentation","Filler Process Var","Case Packer","Palletizer","Sidel Empty Bottle","Sidel Full Bottle","Sidel Empty Case","Sidel Full Case","LPD","Depal"];
+const NOT_RUNNING_SET=new Set([0,2,3,4]);
+const RS={0:{txt:"Stopped",color:"#c64d4d"},1:{txt:"Running",color:"#1e9a5d"},2:{txt:"Faulted",color:"#cf8a11"},3:{txt:"Idle",color:"#735ce0"},4:{txt:"Changeover",color:"#2f6fed"}};
+const LINE_COLORS=['#2f6fed','#0f8e97','#735ce0','#cf8a11','#c64d4d'];
+let selectedByUser=false;
+let activeLine=0, autoRotate=true, rotateEveryMs=12000, lastRotateMs=0, mqttConnected=false, client=null;
+const state={rsCurrent:Array(5).fill(-1),rawFeed:Array(5).fill("--------"),decodedDesc:Array(5).fill("Other"),lastMsgMs:Array(5).fill(0),lastRsMs:Array(5).fill(0),lastFaultMs:Array(5).fill(0),rsHist:Array.from({length:5},()=>Array(HIST_LEN).fill(-1)),rsHead:Array(5).fill(0),rsHasData:Array(5).fill(false),timeline:Array.from({length:5},()=>Array(TIMELINE_LEN).fill(-1)),timelineHead:Array(5).fill(0),timelineHasData:Array(5).fill(false),rsBucketMs:0,timelineBucketMs:0,oee:Array.from({length:5},()=>({shiftStartMs:0,notRunMs:0,lastStateMs:0})),catAccumMs:Array.from({length:5},()=>Array(CAT_KEYS.length).fill(0)),catLastMs:Array(5).fill(0),events:[],sessionStartedMs:Date.now(),brokerInfo:`${CONFIG.protocol}://${CONFIG.host}:${CONFIG.port}${CONFIG.path}`};
+const lineStateStartMs=Array(5).fill(0);
+const longestStateMs={idle:0,fault:0};
+const els={heroScore:document.getElementById('heroScore'),liveDot:document.getElementById('liveDot'),liveStatusText:document.getElementById('liveStatusText'),mqttDot:document.getElementById('mqttDot'),mqttText:document.getElementById('mqttText'),netDot:document.getElementById('netDot'),netText:document.getElementById('netText'),shiftText:document.getElementById('shiftText'),countdownText:document.getElementById('countdownText'),clockText:document.getElementById('clockText'),rotateBtn:document.getElementById('rotateBtn'),lineList:document.getElementById('lineList'),statusMatrix:document.getElementById('statusMatrix'),attentionList:document.getElementById('attentionList'),siteTicker:document.getElementById('siteTicker'),focusTitle:document.getElementById('focusTitle'),focusNum:document.getElementById('focusNum'),focusTxt:document.getElementById('focusTxt'),focusFault:document.getElementById('focusFault'),focusMeta:document.getElementById('focusMeta'),priorityStrip:document.getElementById('priorityStrip'),focusLive:document.getElementById('focusLive'),oeePct:document.getElementById('oeePct'),oeeShift:document.getElementById('oeeShift'),oeeEnds:document.getElementById('oeeEnds'),legendWrap:document.getElementById('legendWrap'),categoryBars:document.getElementById('categoryBars'),decoderPanel:document.getElementById('decoderPanel'),eventsList:document.getElementById('eventsList'),broadcastList:document.getElementById('broadcastList'),sessionPanel:document.getElementById('sessionPanel'),focusTimeline:document.getElementById('focusTimeline'),allLinesStrip:document.getElementById('allLinesStrip'),paretoChart:document.getElementById('paretoChart'),microChart:document.getElementById('microChart'),oeeDial:document.getElementById('oeeDial'),fleetDial:document.getElementById('fleetDial'),stateComposition:document.getElementById('stateComposition'),freshnessRow:document.getElementById('freshnessRow'),stateTrend:document.getElementById('stateTrend'),smoothBtn:document.getElementById('smoothBtn')};
+const rsText=v=>RS[v]?.txt||'Unknown'; const rsColor=v=>RS[v]?.color||'#6f819d'; const lineName=i=>`LLD${i+1}`; const lineColor=i=>LINE_COLORS[i]||'#17365d';
+function fmtHMS(ms){const t=Math.max(0,Math.floor(ms/1000));const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
+function fmtAgo(ms){if(!ms)return'--';const d=Math.max(0,Math.floor((Date.now()-ms)/1000));if(d<60)return`${d}s ago`;const m=Math.floor(d/60);if(m<60)return`${m}m ago`;return`${Math.floor(m/60)}h ${m%60}m ago`}
+function clamp(n,min,max){return Math.max(min,Math.min(max,n))}
+function freshnessPct(ms){if(!ms)return 0; return clamp(100-((Date.now()-ms)/15000)*100,0,100)}
+function pushEvent(kind,ln,text,sub=''){state.events.unshift({kind,ln,text,sub,ts:Date.now()}); if(state.events.length>40) state.events.length=40}
+function extractRsInt(message){try{const doc=JSON.parse(message);if(doc&&doc.v!=null){const v=typeof doc.v==='string'?parseInt(doc.v,10):Number(doc.v);if(Number.isFinite(v)) return v|0;}if(doc&&Array.isArray(doc.values)&&doc.values.length>0){const last=doc.values[doc.values.length-1];const v=Number(last?.v);if(Number.isFinite(v)) return v|0;}}catch(_){}return null}
+function extractRawValue(message){try{const doc=JSON.parse(message);let v=null;if(doc&&doc.v!=null) v=Number(doc.v); else if(doc&&Array.isArray(doc.values)&&doc.values.length>0) v=Number(doc.values[doc.values.length-1]?.v); if(v==null||!Number.isFinite(v)) return '--------'; return String(Math.trunc(v));}catch(_){const digits=String(message).replace(/\D+/g,'');return digits||'--------';}}
+function decodeFeedValue(raw){const s=String(raw??'');let start=-1;for(let i=0;i<s.length;i++){const ch=s.charCodeAt(i);if(ch>=48&&ch<=57){start=i;break;}}if(start<0)return'Other';let end=start;while(end<s.length){const ch=s.charCodeAt(end);if(ch<48||ch>57)break;end++;}const len=end-start;if(len<3)return'Other';const d3={310:'Changeover Compatible',320:'Changeover Non-Compatible',330:'Changeover Full Size',340:'Changeover Partial Size',350:'Preventative Maintenance',360:'Not Scheduled Downtime',370:'Waiting For Batch',380:'Waiting For Material',390:'Staffing'};const f2={10:'Filler Safety',11:'Filler Machine Not Ready',12:'Filler Machine Jam',13:'Filler Motor Drive Status',14:'Filler Pump/Valve/Act',15:'Filler Instrumentation',16:'Filler Process Var'};if(len===3)return d3[parseInt(s.slice(start,start+3),10)]||'Other';if(len>=8){const first4=parseInt(s.slice(start,start+4),10);if(first4===0){const a=d3[parseInt(s.slice(end-3,end),10)];if(a)return a;const tail4=s.slice(end-4,end);return f2[parseInt(tail4.slice(0,2),10)]||'Other';}switch(first4){case 1730:return'Case Packer';case 1745:return'Palletizer';case 1850:return'Sidel Empty Bottle';case 1755:return'Sidel Full Bottle';case 1760:return'Sidel Empty Case';case 1765:return'Sidel Full Case';case 1790:return'LPD';case 1810:case 1811:return'Depal';default:return'Other';}}if(len>=4)return f2[parseInt(s.slice(start,start+2),10)]||'Other';return'Other'}
+const _dtf=new Intl.DateTimeFormat('en-US',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+function getTZParts(ms){const parts=_dtf.formatToParts(new Date(ms));const out={};for(const p of parts) if(p.type!=='literal') out[p.type]=p.value;return{y:+out.year,mo:+out.month,d:+out.day,h:+out.hour,mi:+out.minute,s:+out.second}}
+function tzLocalToEpoch(y,mo,d,h,mi,s){let utcGuess=Date.UTC(y,mo-1,d,h,mi,s);for(let k=0;k<3;k++){const p=getTZParts(utcGuess);const desired=Date.UTC(y,mo-1,d,h,mi,s);const got=Date.UTC(p.y,p.mo-1,p.d,p.h,p.mi,p.s);utcGuess+=(desired-got);}return utcGuess}
+function addDaysYMD(y,mo,d,delta){const dt=new Date(Date.UTC(y,mo-1,d,12,0,0));dt.setUTCDate(dt.getUTCDate()+delta);return{y:dt.getUTCFullYear(),mo:dt.getUTCMonth()+1,d:dt.getUTCDate()}}
+function getCurrentShift(nowMs){const p=getTZParts(nowMs);const mins=p.h*60+p.mi;const s1=5*60+30,s2=13*60+30,s3=21*60+30;let shiftNum=3,startY=p.y,startMo=p.mo,startD=p.d,startH=21,startMi=30;if(mins>=s1&&mins<s2){shiftNum=1;startH=5;startMi=30;}else if(mins>=s2&&mins<s3){shiftNum=2;startH=13;startMi=30;}else if(mins<s1){const prev=addDaysYMD(p.y,p.mo,p.d,-1);startY=prev.y;startMo=prev.mo;startD=prev.d;}const shiftStartMs=tzLocalToEpoch(startY,startMo,startD,startH,startMi,0);return{shiftNum,shiftStartMs,shiftEndMs:shiftStartMs+SHIFT_MS}}
+function ensureShiftState(nowMs){const sh=getCurrentShift(nowMs);for(let ln=0;ln<5;ln++){if(state.oee[ln].shiftStartMs!==sh.shiftStartMs){state.oee[ln].shiftStartMs=sh.shiftStartMs;state.oee[ln].notRunMs=0;state.oee[ln].lastStateMs=nowMs;state.catLastMs[ln]=nowMs;for(let i=0;i<CAT_KEYS.length;i++) state.catAccumMs[ln][i]=0;pushEvent('shift',ln,`${lineName(ln)} started Shift ${sh.shiftNum}`,'Shift counters reset')}}return sh}
+function currentCatIdxForLine(ln){const rs=clamp(Number.isFinite(state.rsCurrent[ln])?state.rsCurrent[ln]:0,0,4);if(rs===1) return 1;const desc=state.decodedDesc[ln];const idx=CAT_KEYS.indexOf(desc);if(idx>=0) return idx;return rs}
+function accumulateNotRunningUpTo(nowMs,ln){const st=state.oee[ln];if(st.lastStateMs===0) st.lastStateMs=nowMs;const dt=nowMs-st.lastStateMs;if(dt>0&&NOT_RUNNING_SET.has(state.rsCurrent[ln])) st.notRunMs=Math.min(SHIFT_MS,st.notRunMs+dt);st.lastStateMs=nowMs}
+function accumulateCategoriesUpTo(nowMs,ln){if(state.catLastMs[ln]===0) state.catLastMs[ln]=nowMs;const dt=nowMs-state.catLastMs[ln];if(dt<=0)return;const idx=currentCatIdxForLine(ln);state.catAccumMs[ln][idx]=Math.min(SHIFT_MS,state.catAccumMs[ln][idx]+dt);state.catLastMs[ln]=nowMs}
+function computeOeePct(ln){const notRun=Math.min(SHIFT_MS,state.oee[ln].notRunMs);return((SHIFT_MS-notRun)/SHIFT_MS)*100}
+function advanceBuckets(){const now=Date.now();if(!state.rsBucketMs) state.rsBucketMs=now;if(!state.timelineBucketMs) state.timelineBucketMs=now;while(now-state.rsBucketMs>=BUCKET_MS){state.rsBucketMs+=BUCKET_MS;for(let ln=0;ln<5;ln++){state.rsHead[ln]=(state.rsHead[ln]+1)%HIST_LEN;state.rsHist[ln][state.rsHead[ln]]=state.rsCurrent[ln];state.rsHasData[ln]=true;}}while(now-state.timelineBucketMs>=TIMELINE_BUCKET_MS){state.timelineBucketMs+=TIMELINE_BUCKET_MS;for(let ln=0;ln<5;ln++){state.timelineHead[ln]=(state.timelineHead[ln]+1)%TIMELINE_LEN;state.timeline[ln][state.timelineHead[ln]]=state.rsCurrent[ln];state.timelineHasData[ln]=true;}}}
+function buildAttentionQueue(){const q=[];for(let ln=0;ln<5;ln++){const rs=state.rsCurrent[ln],fault=state.rawFeed[ln],desc=state.decodedDesc[ln],age=state.lastMsgMs[ln]?Date.now()-state.lastMsgMs[ln]:999999;let severity=0,title=`${lineName(ln)} normal`,body='No immediate action.';if(age>15000){severity=96;title=`${lineName(ln)} stale publisher`;body=`No fresh message for ${fmtAgo(state.lastMsgMs[ln])}.`;}else if(rs===2){severity=92;title=`${lineName(ln)} faulted`;body=`RunStatus faulted. Fault ${fault} / ${desc}.`;}else if(rs===3){severity=58;title=`${lineName(ln)} idle`;body=`Idle with ${fault}. Confirm whether planned or blocked.`;}else if(rs===4){severity=47;title=`${lineName(ln)} in changeover`;body=`Track duration and readiness to return to run.`;}else if(rs===1&&desc!=='Other'&&desc!=='Run'){severity=34;title=`${lineName(ln)} running with active category`;body=`${desc} / code ${fault}.`;}else if(rs<0){severity=72;title=`${lineName(ln)} no data`;body='No RunStatus received yet.';}q.push({ln,severity,title,body});}return q.sort((a,b)=>b.severity-a.severity)}
+function operatorRead(ln){const rs=state.rsCurrent[ln],raw=state.rawFeed[ln],desc=state.decodedDesc[ln];if(rs===1)return`${lineName(ln)} is running. Current code ${raw} is classified as ${desc}.`;if(rs===2)return`${lineName(ln)} is faulted. Check ${desc} path for code ${raw}.`;if(rs===3)return`${lineName(ln)} is idle with code ${raw}. Confirm whether this is planned.`;if(rs===4)return`${lineName(ln)} is in changeover. Watch restart readiness and duration.`;if(rs===0)return`${lineName(ln)} is stopped. Review latest code ${raw}.`;return`${lineName(ln)} has not published a clear state yet.`}
+function orderedHist(ln){const arr=state.rsHist[ln],head=state.rsHead[ln],out=[],start=(head+1)%HIST_LEN;for(let i=0;i<HIST_LEN;i++) out.push(arr[(start+i)%HIST_LEN]);return out}
+function orderedTimeline(ln){const arr=state.timeline[ln],head=state.timelineHead[ln],out=[],start=(head+1)%TIMELINE_LEN;for(let i=0;i<TIMELINE_LEN;i++) out.push(arr[(start+i)%TIMELINE_LEN]);return out}
+function setNetworkUI(){const online=navigator.onLine;els.netDot.className=`dot ${online?'green':'red'}`;els.netText.textContent=online?'Network online':'Network offline'}
+function setMqttUI(connected,msg=''){mqttConnected=connected;els.mqttDot.className=`dot ${connected?'green':'red'}`;els.mqttText.textContent=connected?'MQTT connected':(msg||'MQTT down')}
+function connectMqtt(){const url=`${CONFIG.protocol}://${CONFIG.host}:${CONFIG.port}${CONFIG.path}`;const clientId=CONFIG.clientIdPrefix+Math.random().toString(16).slice(2);setMqttUI(false,'Connecting');client=mqtt.connect(url,{username:CONFIG.username,password:CONFIG.password,clientId,clean:CONFIG.clean,keepalive:CONFIG.keepalive,connectTimeout:CONFIG.connectTimeout,reconnectPeriod:CONFIG.reconnectPeriod});client.on('connect',()=>{setMqttUI(true);[...mqtt_rs,...mqtt_l].forEach(t=>client.subscribe(t));pushEvent('session',-1,'MQTT session established',state.brokerInfo)});client.on('reconnect',()=>setMqttUI(false,'Reconnecting'));client.on('close',()=>setMqttUI(false,'Closed'));client.on('error',()=>setMqttUI(false,'Error'));client.on('message',(topic,payload)=>handleMessage(topic,payload.toString()))}
+function handleMessage(topic,msg){const now=Date.now();ensureShiftState(now);let ln=-1,isRs=false;for(let i=0;i<5;i++){if(topic===mqtt_rs[i]){ln=i;isRs=true;break;}if(topic===mqtt_l[i]){ln=i;isRs=false;break;}}if(ln<0)return;if(isRs){accumulateNotRunningUpTo(now,ln);const prev=state.rsCurrent[ln];const v=extractRsInt(msg);if(v!=null){state.rsCurrent[ln]=v;state.lastMsgMs[ln]=now;state.lastRsMs[ln]=now;state.rsHist[ln][state.rsHead[ln]]=v;state.rsHasData[ln]=true;state.timeline[ln][state.timelineHead[ln]]=v;state.timelineHasData[ln]=true;state.oee[ln].lastStateMs=now;if(prev!==v){lineStateStartMs[ln]=now;pushEvent('state',ln,`${lineName(ln)} → ${rsText(v)}`,`RunStatus ${prev} → ${v}`);}}}else{const raw=extractRawValue(msg);const prev=state.rawFeed[ln];state.rawFeed[ln]=raw;state.decodedDesc[ln]=decodeFeedValue(raw);state.lastMsgMs[ln]=now;state.lastFaultMs[ln]=now;if(prev!==raw) pushEvent('fault',ln,`${lineName(ln)} fault ${raw}`,state.decodedDesc[ln]);}}
+els.rotateBtn.onclick=()=>{autoRotate=!autoRotate; if(autoRotate) selectedByUser=false; lastRotateMs=Date.now(); els.rotateBtn.textContent=autoRotate?'Pause Rotate':'Resume Rotate'};
+els.smoothBtn.onclick=()=>{smoothTrend=!smoothTrend; els.smoothBtn.textContent=`Smoothing: ${smoothTrend?'On':'Off'}`; drawStateTrend();};
+function rotateFocusMaybe(){if(!autoRotate||selectedByUser)return;const now=Date.now();if(now-lastRotateMs>rotateEveryMs){activeLine=(activeLine+1)%5;lastRotateMs=now}}
+function makeDpi(canvas){const rect=canvas.getBoundingClientRect();const dpr=window.devicePixelRatio||1;const w=Math.max(1,Math.round(rect.width));const h=Math.max(1,Math.round(rect.height));if(canvas._w===w&&canvas._h===h&&canvas._dpr===dpr)return canvas.getContext('2d');canvas._w=w;canvas._h=h;canvas._dpr=dpr;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return ctx}
+function drawDonut(canvas,pct,colorA,colorB,label,sub){const ctx=makeDpi(canvas),W=canvas._w,H=canvas._h;ctx.clearRect(0,0,W,H);const cx=W/2,cy=H/2,r=Math.min(W,H)*0.38;const start=Math.PI*0.82,end=Math.PI*2.18,span=end-start;ctx.lineWidth=12;ctx.lineCap='round';ctx.strokeStyle='#e6edf6';ctx.beginPath();ctx.arc(cx,cy,r,start,end);ctx.stroke();const p=clamp(pct,0,100);const ang=start+span*(p/100);const grad=ctx.createLinearGradient(0,0,W,H);grad.addColorStop(0,colorA);grad.addColorStop(1,colorB||colorA);ctx.strokeStyle=grad;ctx.beginPath();ctx.arc(cx,cy,r,start,ang);ctx.stroke();ctx.fillStyle='#f7f9fc';ctx.beginPath();ctx.arc(cx,cy,r-18,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17365d';ctx.font='800 18px Inter, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,cx,cy-4);ctx.fillStyle='#6f819d';ctx.font='700 10px Inter, sans-serif';ctx.fillText(sub,cx,cy+16)}
+function drawOeeDial(pct){let color='#1e9a5d'; if(pct<60) color='#c64d4d'; else if(pct<85) color='#cf8a11'; drawDonut(els.oeeDial,pct,color,'#2f6fed',`${Math.round(pct)}%`,'shift')}
+function drawFleetDial(){const running=state.rsCurrent.filter(v=>v===1).length; drawDonut(els.fleetDial,(running/5)*100,'#0f8e97','#2f6fed',`${running}/5`,'running')}
+function drawMicroChart(){const c=els.microChart,ctx=makeDpi(c),W=c._w,H=c._h;ctx.clearRect(0,0,W,H);const hist=orderedHist(activeLine),pad={l:8,r:8,t:10,b:18},uw=W-pad.l-pad.r,uh=H-pad.t-pad.b;ctx.strokeStyle='#e4ebf4';for(let i=0;i<4;i++){const y=pad.t+uh*(i/3);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke()}let prev=null;hist.forEach((v,i)=>{if(v<0)return;const x=pad.l+uw*(i/(hist.length-1));const y=pad.t+((4-clamp(v,0,4))/4)*uh;if(prev){ctx.strokeStyle=rsColor(v);ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(x,y);ctx.stroke()}prev={x,y}});if(prev){ctx.fillStyle=rsColor(state.rsCurrent[activeLine]);ctx.beginPath();ctx.arc(prev.x,prev.y,4,0,Math.PI*2);ctx.fill()}ctx.fillStyle='#6f819d';ctx.font='800 10px Inter, sans-serif';ctx.fillText('60m',8,H-4);ctx.fillText('now',W-28,H-4)}
+function drawFocusTimeline(){const c=els.focusTimeline,ctx=makeDpi(c),W=c._w,H=c._h;ctx.clearRect(0,0,W,H);const hist=orderedTimeline(activeLine),padL=20,padR=10,y=48,rowH=46,uw=W-padL-padR;ctx.fillStyle='#f3f6fb';ctx.fillRect(padL,y,uw,rowH);const segW=uw/hist.length;hist.forEach((v,i)=>{ctx.fillStyle=v<0?'#e5ebf5':rsColor(v);ctx.fillRect(padL+i*segW,y,Math.ceil(segW)+1,rowH)});ctx.strokeStyle='#dfe7f2';for(let i=0;i<=8;i++){const x=padL+uw*(i/8);ctx.beginPath();ctx.moveTo(x,y-16);ctx.lineTo(x,y+rowH+8);ctx.stroke();ctx.fillStyle='#6f819d';ctx.font='800 11px Inter, sans-serif';ctx.fillText(`${8-i}h`,x-8,y-22)}ctx.fillStyle='#17365d';ctx.font='800 16px Inter, sans-serif';ctx.fillText(`${lineName(activeLine)} shift rhythm`,padL,22);ctx.font='700 12px Inter, sans-serif';ctx.fillStyle='#2d3f5e';ctx.fillText(`Current state: ${rsText(state.rsCurrent[activeLine])}`,padL,y+rowH+30)}
+function drawAllLinesStrip(){const c=els.allLinesStrip,ctx=makeDpi(c),W=c._w,H=c._h;ctx.clearRect(0,0,W,H);const pad={l:66,r:10,t:18,b:18},uw=W-pad.l-pad.r,rowGap=12,rowH=28;for(let ln=0;ln<5;ln++){const y=pad.t+ln*(rowH+rowGap);ctx.fillStyle='#17365d';ctx.font='800 13px Inter, sans-serif';ctx.fillText(lineName(ln),8,y+18);const hist=orderedHist(ln),segW=uw/hist.length;for(let i=0;i<hist.length;i++){const v=hist[i];ctx.fillStyle=v<0?'#e5ebf5':rsColor(v);ctx.fillRect(pad.l+i*segW,y,Math.ceil(segW)+1,rowH)}if(ln===activeLine){ctx.strokeStyle='#2f6fed';ctx.lineWidth=2;ctx.strokeRect(pad.l-2,y-2,uw+4,rowH+4)}}ctx.fillStyle='#6f819d';ctx.font='800 10px Inter, sans-serif';ctx.fillText('60m ago',pad.l,H-4);ctx.fillText('now',W-28,H-4)}
+function drawPareto(){const c=els.paretoChart,ctx=makeDpi(c),W=c._w,H=c._h;ctx.clearRect(0,0,W,H);const data=CAT_KEYS.map((k,i)=>({k,ms:state.catAccumMs[activeLine][i]})).sort((a,b)=>b.ms-a.ms).slice(0,6);const pad={l:120,r:18,t:14,b:18},uh=H-pad.t-pad.b,rowH=uh/data.length,max=Math.max(1,...data.map(d=>d.ms));data.forEach((d,i)=>{const y=pad.t+i*rowH+6;const w=((W-pad.l-pad.r)*d.ms/max);ctx.fillStyle='#eef3f9';ctx.fillRect(pad.l,y,W-pad.l-pad.r,rowH-12);ctx.fillStyle=i===0?'#2f6fed':'#0f8e97';ctx.fillRect(pad.l,y,w,rowH-12);ctx.fillStyle='#17365d';ctx.font='800 12px Inter, sans-serif';ctx.fillText(d.k,8,y+(rowH-12)/2+4);ctx.textAlign='right';ctx.fillStyle='#6f819d';ctx.fillText(`${Math.round(d.ms/60000)}m`,W-8,y+(rowH-12)/2+4);ctx.textAlign='left'})}
+function drawStateTrend(){const c=els.stateTrend,ctx=makeDpi(c),W=c._w,H=c._h;ctx.clearRect(0,0,W,H);const pad={l:42,r:12,t:12,b:32},uw=W-pad.l-pad.r,uh=H-pad.t-pad.b;ctx.strokeStyle='#e4ebf4';ctx.fillStyle='#6f819d';ctx.font='800 10px Inter, sans-serif';for(let v=0;v<=4;v++){const y=pad.t+((4-v)/4)*uh;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillText(String(v),12,y+3);}for(let ln=0;ln<5;ln++){const hist=orderedHist(ln);let prev=null;for(let i=0;i<hist.length;i++){const v=hist[i];if(v<0) continue;const x=pad.l+uw*(i/Math.max(1,hist.length-1));const y=pad.t+((4-clamp(v,0,4))/4)*uh + (ln-2)*1.2;if(prev){ctx.strokeStyle=lineColor(ln);ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(prev.x,prev.y);if(smoothTrend){const mx=(prev.x+x)/2;ctx.quadraticCurveTo(prev.x,prev.y,mx,(prev.y+y)/2);ctx.stroke();ctx.beginPath();ctx.moveTo(mx,(prev.y+y)/2);}ctx.lineTo(x,y);ctx.stroke();}prev={x,y};}if(prev){ctx.fillStyle=lineColor(ln);ctx.beginPath();ctx.arc(prev.x,prev.y,3.5,0,Math.PI*2);ctx.fill();}}ctx.fillStyle='#6f819d';ctx.font='800 10px Inter, sans-serif';ctx.fillText('60m ago',pad.l,H-18);ctx.fillText('now',W-28,H-18);const legendY=H-6;let x=pad.l;for(let ln=0;ln<5;ln++){ctx.fillStyle=lineColor(ln);ctx.font='800 10px Inter, sans-serif';ctx.fillText(lineName(ln),x,legendY);x+=56;}}
+function renderLegend(){els.legendWrap.innerHTML='';Object.entries(RS).forEach(([k,v])=>{const d=document.createElement('div');d.className='legend';d.innerHTML=`<i style="background:${v.color}"></i><div class="txt"><b>${k} ${v.txt}</b><span>Run status state</span></div>`;els.legendWrap.appendChild(d)})}
+function renderHeroScore(){const running=state.rsCurrent.filter(v=>v===1).length,idle=state.rsCurrent.filter(v=>v===3).length,faulted=state.rsCurrent.filter(v=>v===2).length,live=state.lastMsgMs.filter(ms=>Date.now()-ms<10000).length;let exceptions=0,longestIdle=0,longestFault=0;for(let ln=0;ln<5;ln++){const rs=state.rsCurrent[ln];if(rs===2||rs===3||rs===4||(!state.lastMsgMs[ln]||Date.now()-state.lastMsgMs[ln]>15000)) exceptions++;const start=lineStateStartMs[ln]||state.lastRsMs[ln]||Date.now();const dur=Math.max(0,Date.now()-start);if(rs===3) longestIdle=Math.max(longestIdle,dur);if(rs===2) longestFault=Math.max(longestFault,dur);}const score=[{k:'Lines Running',v:running,s:`${idle} idle / ${faulted} faulted`},{k:'Fresh Publishers',v:live,s:'updated in last 10s'},{k:'Exceptions',v:exceptions,s:'fault / idle / stale / changeover'},{k:'Longest Idle',v:fmtHMS(longestIdle),s:'current portfolio maximum'},{k:'Longest Fault',v:fmtHMS(longestFault),s:'current portfolio maximum'},{k:'Events This Session',v:state.events.length,s:'rolling event ledger'}];els.heroScore.innerHTML=score.map(x=>`<div class="scoreCard"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s">${x.s}</div></div>`).join('');els.liveDot.className=`dot ${live>0?'green':'red'}`;els.liveStatusText.textContent=live>0?`Receiving ${live} fresh publishers`:'No fresh publishers'}
+function renderLineList(){els.lineList.innerHTML='';for(let ln=0;ln<5;ln++){const rs=state.rsCurrent[ln],raw=state.rawFeed[ln],desc=state.decodedDesc[ln],fresh=freshnessPct(state.lastMsgMs[ln]);const el=document.createElement('button');el.type='button';el.className=`lineCard ${activeLine===ln?'active':''}`;el.style.display='block';el.style.width='100%';el.style.textAlign='left';el.style.background=activeLine===ln?'linear-gradient(180deg,#ffffff,#f4f8fd)':'var(--surface)';el.innerHTML=`<div class="lineTop"><div><div class="lineName" style="color:${lineColor(ln)}">${lineName(ln)}</div><div class="lineSub">Liquid Laundry</div></div><div class="statePill" style="color:${rsColor(rs)}">${rsText(rs)}</div></div><div class="lineGrid"><div class="mini"><div class="k">RunStatus</div><div class="v">${rs<0?'--':rs}</div></div><div class="mini"><div class="k">FaultCode</div><div class="v">${raw}</div></div><div class="mini"><div class="k">Age</div><div class="v">${fmtAgo(state.lastMsgMs[ln])}</div></div></div><div class="mini" style="margin-top:8px"><div class="k">Current Decode</div><div class="v">${desc}</div><div class="miniBar"><span style="width:${fresh}%;background:${fresh>66?'var(--green)':fresh>33?'var(--amber)':'var(--red)'}"></span></div></div>`;el.addEventListener('pointerdown',()=>{activeLine=ln;selectedByUser=true;autoRotate=false;lastRotateMs=Date.now();els.rotateBtn.textContent='Resume Rotate';render();});els.lineList.appendChild(el)}}
+function renderMatrix(){els.statusMatrix.innerHTML='';for(let ln=0;ln<5;ln++){const rs=state.rsCurrent[ln],fresh=freshnessPct(state.lastMsgMs[ln]);const el=document.createElement('div');el.className='matrixCell';el.innerHTML=`<div class="top"><div class="ln">${lineName(ln)}</div><span class="dot" style="background:${rsColor(rs)}"></span></div><div class="rs" style="color:${rsColor(rs)}">${rs<0?'--':rs}</div><div class="sub">${rsText(rs)}</div><div class="bar"><span style="width:${fresh}%;background:${fresh>66?'var(--green)':fresh>33?'var(--amber)':'var(--red)'}"></span></div>`;els.statusMatrix.appendChild(el)}}
+function renderAttention(){const q=buildAttentionQueue().slice(0,5);els.attentionList.innerHTML=q.map(a=>`<div class="action"><div class="ttl">${a.title}</div><div class="body">${a.body}</div></div>`).join('')}
+function renderTicker(){const msgs=[];for(let ln=0;ln<5;ln++) msgs.push(`${lineName(ln)} ${rsText(state.rsCurrent[ln])} · Fault ${state.rawFeed[ln]} · ${state.decodedDesc[ln]}`);els.siteTicker.innerHTML=[...msgs,...msgs].map(m=>`<span>${m}</span>`).join('')}
+function renderFocus(){const ln=activeLine,rs=state.rsCurrent[ln],raw=state.rawFeed[ln],desc=state.decodedDesc[ln],age=state.lastMsgMs[ln]?Date.now()-state.lastMsgMs[ln]:999999,live=age<5000,sh=getCurrentShift(Date.now()),oee=computeOeePct(ln);els.focusTitle.textContent=lineName(ln);els.focusNum.textContent=rs<0?'-':rs;els.focusNum.style.color=rsColor(rs);els.focusTxt.textContent=rsText(rs);els.focusTxt.style.color=rsColor(rs);els.focusFault.textContent=`FaultCode: ${raw} · ${desc}`;els.focusLive.textContent=live?'LIVE':'STALE';els.focusLive.style.color=live?'var(--green)':'var(--red)';const meta=[{k:'Last RS',v:fmtAgo(state.lastRsMs[ln]),s:state.lastRsMs[ln]?new Date(state.lastRsMs[ln]).toLocaleTimeString():'--'},{k:'Last Fault',v:fmtAgo(state.lastFaultMs[ln]),s:state.lastFaultMs[ln]?new Date(state.lastFaultMs[ln]).toLocaleTimeString():'--'},{k:'Current Category',v:desc,s:'live decode category'},{k:'Publisher Freshness',v:age<10000?'Fresh':'Aging',s:fmtAgo(state.lastMsgMs[ln])}];els.focusMeta.innerHTML=meta.map(m=>`<div class="metaBox"><div class="k">${m.k}</div><div class="v">${m.v}</div><div class="s">${m.s}</div></div>`).join('');const pri=[{ttl:'Executive Read',body:operatorRead(ln)},{ttl:'Likely Focus',body:desc!=='Other'?`Work the ${desc} path first.`:`Confirm exact reason path from source code ${raw}.`},{ttl:'Signal Confidence',body:age<10000?`Signal is fresh and suitable for action.`:`Signal is aging; verify source path before acting.`}];els.priorityStrip.innerHTML=pri.map(p=>`<div class="priorityCard"><div class="ttl">${p.ttl}</div><div class="body">${p.body}</div></div>`).join('');els.oeePct.textContent=`${Math.round(oee)}%`;els.oeeShift.textContent=`Shift ${sh.shiftNum} · ET`;els.oeeEnds.textContent=`Ends in ${fmtHMS(Math.max(0,sh.shiftEndMs-Date.now()))}`;drawOeeDial(oee)}
+function renderPortfolioHealth(){drawFleetDial();const counts={0:0,1:0,2:0,3:0,4:0};state.rsCurrent.forEach(v=>{if(v in counts) counts[v]++});const total=5;els.stateComposition.innerHTML='';[1,2,3,4,0].forEach(k=>{const seg=document.createElement('div');seg.className='seg';seg.style.width=`${(counts[k]/total)*100}%`;seg.style.background=rsColor(Number(k));seg.title=`${rsText(Number(k))}: ${counts[k]}`;els.stateComposition.appendChild(seg)});els.freshnessRow.innerHTML='';for(let ln=0;ln<5;ln++){const fresh=freshnessPct(state.lastMsgMs[ln]);const card=document.createElement('div');card.className='freshCard';card.innerHTML=`<div class="name">${lineName(ln)}</div><div class="val">${Math.round(fresh)}%</div><div class="bar"><span style="width:${fresh}%;background:${fresh>66?'var(--green)':fresh>33?'var(--amber)':'var(--red)'}"></span></div>`;els.freshnessRow.appendChild(card)}}
+function renderCategoryBars(){const totals=state.catAccumMs[activeLine];const top=CAT_KEYS.map((k,i)=>({k,ms:totals[i]})).sort((a,b)=>b.ms-a.ms).slice(0,8);els.categoryBars.innerHTML=top.map(it=>{const pct=(it.ms/SHIFT_MS)*100,mins=Math.round(it.ms/60000);return`<div class="smallRow"><div style="font-size:12px;font-weight:800;color:var(--navy)">${it.k}</div><div class="bar"><span style="width:${pct}%"></span></div><div style="text-align:right;font-size:12px;font-weight:800;color:var(--muted)">${mins}m</div></div>`}).join('')}
+function renderDecoderPanel(){const ln=activeLine,raw=state.rawFeed[ln],desc=state.decodedDesc[ln],rs=state.rsCurrent[ln];const cards=[{ttl:'Raw Feed Value',body:raw},{ttl:'Decoded Category',body:desc},{ttl:'RunStatus Meaning',body:`${rs} = ${rsText(rs)}`},{ttl:'Operational Summary',body:operatorRead(ln)}];els.decoderPanel.innerHTML=cards.map(c=>`<div class="action"><div class="ttl">${c.ttl}</div><div class="body">${c.body}</div></div>`).join('')}
+function renderEvents(){els.eventsList.innerHTML=state.events.slice(0,14).map(e=>`<div class="event"><span class="dot ${e.kind==='fault'?'amber':e.kind==='state'?'green':'blue'}"></span><div><div class="txt">${e.text}</div><div class="sub">${e.sub||'Live event'}</div></div><div class="time">${new Date(e.ts).toLocaleTimeString()}</div></div>`).join('')}
+function renderBroadcast(){const running=[],idle=[],stale=[];for(let ln=0;ln<5;ln++){if(state.rsCurrent[ln]===1) running.push(lineName(ln));if(state.rsCurrent[ln]===3) idle.push(lineName(ln));if(!state.lastMsgMs[ln]||Date.now()-state.lastMsgMs[ln]>15000) stale.push(lineName(ln))}const items=[{name:'Running now',pct:(running.length/5)*100,txt:running.length?running.join(', '):'none'},{name:'Idle now',pct:(idle.length/5)*100,txt:idle.length?idle.join(', '):'none'},{name:'Stale publishers',pct:(stale.length/5)*100,txt:stale.length?stale.join(', '):'none'},{name:'Focus OEE proxy',pct:computeOeePct(activeLine),txt:`${Math.round(computeOeePct(activeLine))}%`}];els.broadcastList.innerHTML=items.map(i=>`<div class="smallRow"><div style="font-size:12px;font-weight:800;color:var(--navy)">${i.name}</div><div class="bar"><span style="width:${i.pct}%"></span></div><div style="text-align:right;font-size:12px;font-weight:800;color:var(--muted)">${i.txt}</div></div>`).join('')}
+function renderSession(){const cards=[{ttl:'Broker Endpoint',body:state.brokerInfo},{ttl:'Session Uptime',body:fmtHMS(Date.now()-state.sessionStartedMs)},{ttl:'Connection',body:mqttConnected?'Connected / subscribed':'Disconnected or reconnecting'},{ttl:'Browser State',body:navigator.onLine?'Online':'Offline'}];els.sessionPanel.innerHTML=cards.map(c=>`<div class="action"><div class="ttl">${c.ttl}</div><div class="body">${c.body}</div></div>`).join('')}
+function renderClockShift(){const now=Date.now(),sh=getCurrentShift(now);els.shiftText.textContent=`Shift ${sh.shiftNum}`;els.countdownText.textContent=`Ends in ${fmtHMS(Math.max(0,sh.shiftEndMs-now))}`;els.clockText.textContent=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(now))}
+function renderLegend(){els.legendWrap.innerHTML='';Object.entries(RS).forEach(([k,v])=>{const d=document.createElement('div');d.className='legend';d.innerHTML=`<i style="background:${v.color}"></i>${k} ${v.txt}`;els.legendWrap.appendChild(d)})}
+function renderHeroScore(){const running=state.rsCurrent.filter(v=>v===1).length,idle=state.rsCurrent.filter(v=>v===3).length,faulted=state.rsCurrent.filter(v=>v===2).length,live=state.lastMsgMs.filter(ms=>Date.now()-ms<10000).length;const score=[{k:'Lines Running',v:running,s:`${idle} idle / ${faulted} faulted`},{k:'Fresh Publishers',v:live,s:'updated in last 10s'},{k:'Attention Items',v:buildAttentionQueue().length,s:'ranked live actions'},{k:'Events This Session',v:state.events.length,s:'rolling event ledger'}];els.heroScore.innerHTML=score.map(x=>`<div class="scoreCard"><div class="k">${x.k}</div><div class="v">${x.v}</div><div class="s">${x.s}</div></div>`).join('');els.liveDot.className=`dot ${live>0?'green':'red'}`;els.liveStatusText.textContent=live>0?`Receiving ${live} fresh publishers`:'No fresh publishers'}
+function render(){renderClockShift();renderHeroScore();renderLineList();renderMatrix();renderAttention();renderTicker();renderFocus();renderPortfolioHealth();renderCategoryBars();renderDecoderPanel();renderEvents();renderBroadcast();renderSession();renderLegend();drawMicroChart();drawFocusTimeline();drawAllLinesStrip();drawPareto();drawStateTrend()}
+function boot(){setNetworkUI();ensureShiftState(Date.now());for(let ln=0;ln<5;ln++) lineStateStartMs[ln]=Date.now();render();connectMqtt();window.addEventListener('online',setNetworkUI);window.addEventListener('offline',setNetworkUI);window.addEventListener('resize',render);setInterval(()=>{const now=Date.now();ensureShiftState(now);for(let ln=0;ln<5;ln++){accumulateNotRunningUpTo(now,ln);accumulateCategoriesUpTo(now,ln)}advanceBuckets();rotateFocusMaybe();render()},250)}
+boot();
+
+const assistantState={open:false,busy:false,conversationId:null};
+function getAssistantContext(){
+  const ln=activeLine;
+  const sh=getCurrentShift(Date.now());
+  return {
+    site:'York',
+    area:'Liquid Laundry',
+    focusedLine:lineName(ln),
+    focusedLineIndex:ln,
+    runStatus:state.rsCurrent[ln],
+    runStatusText:rsText(state.rsCurrent[ln]),
+    faultCode:state.rawFeed[ln],
+    decodedCategory:state.decodedDesc[ln],
+    oeeProxyPct:Math.round(computeOeePct(ln)),
+    shiftNumber:sh.shiftNum,
+    shiftEndsIn:fmtHMS(Math.max(0,sh.shiftEndMs-Date.now())),
+    freshness:{
+      focusedLineAge:fmtAgo(state.lastMsgMs[ln]),
+      lld1:fmtAgo(state.lastMsgMs[0]),
+      lld2:fmtAgo(state.lastMsgMs[1]),
+      lld3:fmtAgo(state.lastMsgMs[2]),
+      lld4:fmtAgo(state.lastMsgMs[3]),
+      lld5:fmtAgo(state.lastMsgMs[4])
+    },
+    lines:[0,1,2,3,4].map(i=>({line:lineName(i),runStatus:state.rsCurrent[i],runStatusText:rsText(state.rsCurrent[i]),faultCode:state.rawFeed[i],decodedCategory:state.decodedDesc[i],freshnessAgo:fmtAgo(state.lastMsgMs[i])}))
+  };
+}
+function renderAssistantContext(){
+  const ctx=getAssistantContext();
+  const chips=[`Focus: ${ctx.focusedLine}`,`RunStatus: ${ctx.runStatus} ${ctx.runStatusText}`,`Fault: ${ctx.faultCode}`,`Category: ${ctx.decodedCategory}`,`Shift: ${ctx.shiftNumber}`,`Ends in: ${ctx.shiftEndsIn}`];
+  document.getElementById('assistantContext').innerHTML=chips.map(x=>`<div class="contextChip">${x}</div>`).join('');
+}
+function setAssistantOpen(open){assistantState.open=open;document.getElementById('assistantPanel').classList.toggle('open',open);}
+function pushAssistantMessage(role,text){const host=document.getElementById('assistantMessages');const div=document.createElement('div');div.className=`msg ${role}`;div.textContent=text;host.appendChild(div);host.scrollTop=host.scrollHeight;}
+async function sendAssistantMessage(prefill){
+  const input=document.getElementById('assistantInput');
+  const text=(prefill ?? input.value).trim();
+  if(!text || assistantState.busy) return;
+  if(!prefill) input.value='';
+  setAssistantOpen(true);
+  pushAssistantMessage('user',text);
+  assistantState.busy=true;
+  document.getElementById('assistantSend').disabled=true;
+  document.getElementById('assistantStatusText').textContent='Thinking';
+  try{
+    const response=await fetch('/api/plant-second-brain/respond',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({conversation_id:assistantState.conversationId,prompt:text,context:getAssistantContext()})
+    });
+    if(!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data=await response.json();
+    assistantState.conversationId=data.conversation_id || assistantState.conversationId;
+    pushAssistantMessage('assistant',data.output_text || 'No reply returned.');
+    document.getElementById('assistantStatusText').textContent='Ready';
+  }catch(err){
+    pushAssistantMessage('assistant',`Assistant backend error: ${err.message}`);
+    document.getElementById('assistantStatusText').textContent='Backend error';
+  }finally{
+    assistantState.busy=false;
+    document.getElementById('assistantSend').disabled=false;
+  }
+}
+document.getElementById('assistantToggle').addEventListener('click',()=>setAssistantOpen(!assistantState.open));
+document.getElementById('assistantClose').addEventListener('click',()=>setAssistantOpen(false));
+document.getElementById('assistantSend').addEventListener('click',()=>sendAssistantMessage());
+document.getElementById('assistantInput').addEventListener('keydown',(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAssistantMessage();}});
+document.querySelectorAll('.assistantAction').forEach(btn=>btn.addEventListener('click',()=>sendAssistantMessage(btn.dataset.prompt)));
+const _origRender = render;
+render = function(){ _origRender(); renderAssistantContext(); };
+renderAssistantContext();
+</script>
+</body>
+</html>
