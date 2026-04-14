@@ -389,6 +389,8 @@ function boot(){setNetworkUI();ensureShiftState(Date.now());for(let ln=0;ln<5;ln
 boot();
 
 const assistantState={open:false,busy:false,conversationId:null};
+const ASSISTANT_API_BASE = "https://splendid-comfort-production-68b3.up.railway.app";
+
 function getAssistantContext(){
   const ln=activeLine;
   const sh=getCurrentShift(Date.now());
@@ -433,7 +435,7 @@ async function sendAssistantMessage(prefill){
   document.getElementById('assistantSend').disabled=true;
   document.getElementById('assistantStatusText').textContent='Thinking';
   try{
-    const response=await fetch('/api/plant-second-brain/respond',{
+    const response=await fetch(`${ASSISTANT_API_BASE}/api/plant-second-brain/respond`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({conversation_id:assistantState.conversationId,prompt:text,context:getAssistantContext()})
